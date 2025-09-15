@@ -1,0 +1,13 @@
+{
+  "name": "agora-token-server",
+  "version": "1.0.0",
+  "description": "Agora Token Server deployed on Vercel",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "node api/token.js"
+  },
+  "dependencies": {
+    "agora-token": "^2.0.0"
+  }
+}
