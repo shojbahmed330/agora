@@ -1,26 +1,6 @@
 // api/token.js
 const { RtcTokenBuilder, RtmTokenBuilder, RtcRole, RtmRole } = require('agora-token');
 
-/**
- * GET /api/token?channelName=...&uid=...&role=publisher&tokentype=rtc&expiry=3600
- * or POST JSON { channelName, uid, role, tokentype, expiry }
- *
- * Query params / body:
- * - channelName (required)
- * - uid (optional, default "0")  // you can pass number or string. Here we use numeric UID for buildTokenWithUid
- * - role (publisher | subscriber) default publisher
- * - tokentype (rtc | rtm) default rtc
- * - expiry (seconds) default 3600
- *
- * Response:
- * {
- *   "rtcToken": "...",
- *   "expiresIn": 3600,
- *   "channelName":"...",
- *   "uid":"..."
- * }
- */
-
 module.exports = (req, res) => {
   try {
     const APP_ID = process.env.APP_ID;
@@ -31,21 +11,39 @@ module.exports = (req, res) => {
     }
 
     const q = req.method === 'GET' ? req.query : (req.body || {});
-    const channelName = q.channelName;
     const uid = (q.uid === undefined || q.uid === null) ? '0' : String(q.uid);
+    const callee = q.callee ? String(q.callee) : null;
     const role = (q.role || 'publisher').toLowerCase();
     const tokenType = (q.tokentype || 'rtc').toLowerCase();
-    const expiry = parseInt(q.expiry, 10) || 3600; // seconds
+    const expiry = parseInt(q.expiry, 10) || 3600; // default 1 hour
 
+    // channelName generate
+    let channelName = q.channelName;
     if (!channelName) {
-      return res.status(400).json({ error: 'channelName is required' });
+      if (callee) {
+        // caller + callee মিলিয়ে deterministic channel name বানানো
+        channelName = `call_${[uid, callee].sort().join('_')}`;
+      } else {
+        // যদি শুধু uid থাকে, তাহলে random unique channel বানাবে
+        channelName = `call_${uid}_${Date.now()}`;
+      }
     }
 
     if (tokenType === 'rtc') {
-      // use numeric uid if possible; Agora buildTokenWithUid expects number uid
       const uidInt = Number(uid) || 0;
-      const roleConst = (role === 'publisher' || role === 'host') ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
-      const token = RtcTokenBuilder.buildTokenWithUid(APP_ID, APP_CERTIFICATE, channelName, uidInt, roleConst, expiry);
+      const roleConst = (role === 'publisher' || role === 'host')
+        ? RtcRole.PUBLISHER
+        : RtcRole.SUBSCRIBER;
+
+      const token = RtcTokenBuilder.buildTokenWithUid(
+        APP_ID,
+        APP_CERTIFICATE,
+        channelName,
+        uidInt,
+        roleConst,
+        expiry
+      );
+
       return res.json({
         rtcToken: token,
         expiresIn: expiry,
@@ -55,7 +53,14 @@ module.exports = (req, res) => {
     }
 
     if (tokenType === 'rtm') {
-      const token = RtmTokenBuilder.buildToken(APP_ID, APP_CERTIFICATE, String(uid), RtmRole.Rtm_User, expiry);
+      const token = RtmTokenBuilder.buildToken(
+        APP_ID,
+        APP_CERTIFICATE,
+        String(uid),
+        RtmRole.Rtm_User,
+        expiry
+      );
+
       return res.json({
         rtmToken: token,
         expiresIn: expiry,
