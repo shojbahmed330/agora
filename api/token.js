@@ -3,6 +3,15 @@ const { RtcTokenBuilder, RtmTokenBuilder, RtcRole, RtmRole } = require('agora-to
 
 module.exports = (req, res) => {
   try {
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
     const APP_ID = process.env.APP_ID;
     const APP_CERTIFICATE = process.env.APP_CERTIFICATE;
 
@@ -15,40 +24,56 @@ module.exports = (req, res) => {
     const callee = q.callee ? String(q.callee) : null;
     const role = (q.role || 'publisher').toLowerCase();
     const tokenType = (q.tokentype || 'rtc').toLowerCase();
-    const expiry = parseInt(q.expiry, 10) || 3600; // default 1 hour
+    const expiry = parseInt(q.expiry, 10) || 3600;
 
     // channelName generate
     let channelName = q.channelName;
     if (!channelName) {
       if (callee) {
-        // caller + callee মিলিয়ে deterministic channel name বানানো
         channelName = `call_${[uid, callee].sort().join('_')}`;
       } else {
-        // যদি শুধু uid থাকে, তাহলে random unique channel বানাবে
         channelName = `call_${uid}_${Date.now()}`;
       }
     }
 
     if (tokenType === 'rtc') {
-      const uidInt = Number(uid) || 0;
-      const roleConst = (role === 'publisher' || role === 'host')
-        ? RtcRole.PUBLISHER
-        : RtcRole.SUBSCRIBER;
+      const roleConst =
+        (role === 'publisher' || role === 'host')
+          ? RtcRole.PUBLISHER
+          : RtcRole.SUBSCRIBER;
 
-      const token = RtcTokenBuilder.buildTokenWithUid(
-        APP_ID,
-        APP_CERTIFICATE,
-        channelName,
-        uidInt,
-        roleConst,
-        expiry
-      );
+      let token;
+      let responseUid;
+
+      // ✅ যদি numeric uid হয়
+      if (!isNaN(Number(uid))) {
+        token = RtcTokenBuilder.buildTokenWithUid(
+          APP_ID,
+          APP_CERTIFICATE,
+          channelName,
+          Number(uid),
+          roleConst,
+          expiry
+        );
+        responseUid = Number(uid);
+      } else {
+        // ✅ যদি string uid হয়
+        token = RtcTokenBuilder.buildTokenWithAccount(
+          APP_ID,
+          APP_CERTIFICATE,
+          channelName,
+          uid,
+          roleConst,
+          expiry
+        );
+        responseUid = uid;
+      }
 
       return res.json({
         rtcToken: token,
         expiresIn: expiry,
         channelName,
-        uid: uidInt
+        uid: responseUid
       });
     }
 
