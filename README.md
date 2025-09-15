@@ -7,3 +7,10 @@
 - `/api/token` (GET/POST) → `channelName` ও `uid` দিয়ে Agora RTC/RTM token জেনারেট করে দেয়
 
 ## ফাইল স্ট্রাকচার
+agora-token-server/
+├─ api/
+│ ├─ create_call.js
+│ └─ token.js
+├─ package.json
+├─ README.md
+└─ .env.example
